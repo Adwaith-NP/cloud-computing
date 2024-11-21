@@ -1,5 +1,5 @@
 import docker
-
+import subprocess
 def create_and_interact_with_ubuntu(size=1):
     try:
         # Initialize Docker client
@@ -30,21 +30,16 @@ def create_and_interact_with_ubuntu(size=1):
         print(f"The {size} storage volume is mounted at /mnt/data.")
 
         # Attach to the container for interactive I/O
-        while True:
-            user_command = input("ubuntu> ")
-
-            if user_command.lower() in ["exit", "quit"]:
-                print("Exiting Ubuntu CLI...")
-                break
-
-            exec_result = container.exec_run(user_command, tty=True)
-            output = exec_result.output.decode("utf-8")
-            print(output)
+        try:
+            # Get the container
+            subprocess.run(["docker", "exec", "-it", container.id, "bash"])
+        except KeyError as e:
+            print("Error : ",e)
 
         # Stop and remove the container after exiting
-        container.stop()
-        container.remove()
-        print("Container stopped and removed.")
+        # container.stop()
+        # container.remove()
+        # print("Container stopped and removed.")
 
     except Exception as e:
         print(f"Unexpected error: {e}")
@@ -56,40 +51,52 @@ def interactive_shell(container_name):
     try:
         # Get the container
         container = client.containers.get(container_name)
+        container.start()
         print(f"Connected to container: {container_name}")
-
-        # Start interactive command loop
-        while True:
-            user_command = input("ubuntu> ")
-
-            if user_command.lower() in ["exit", "quit"]:
-                print("Exiting Ubuntu CLI...")
-                break
-
-            # Execute the command inside the container
-            exec_id = client.api.exec_create(
-                container.id, 
-                cmd=user_command, 
-                stdin=True, 
-                tty=True
-            )
-            exec_result = client.api.exec_start(exec_id, tty=True)
-
-            # Display the output
-            print(exec_result.decode("utf-8"))
-
-    except docker.errors.NotFound:
-        print(f"Error: Container '{container_name}' not found.")
-    except Exception as e:
-        print(f"Unexpected error: {e}")
+        subprocess.run(["docker", "exec", "-it", container.id, "bash"])
+        container.stop()
+        container.remove()
+    except KeyError as e:
+        print("Error : ",e)
 
 
 # Usage Example
 
-
+def container_update(container_name,):
+    client = docker.from_env()
+    container = client.containers.get(container_name)
+    
+    image = container.image.tags[0]  # Get the image tag
+    name = container.name
+    
+    # Stop and remove the existing container
+    container.stop()
+    container.remove()
+    
+    # Create a new container with updated tmpfs
+    tmpfs_size = 50000
+    new_container = client.containers.run(
+        image,
+        name=name,
+        stdin_open=True,
+        tty=True,
+        detach=True,
+        cpu_quota=100000,  # 1 CPU
+        cpu_period=100000, # Keep period unchanged
+        mem_limit="512m",  # Reduce memory to 512MB
+        tmpfs={"/mnt/data": f"size={tmpfs_size}m"}  # Updated tmpfs size
+    )
+    
+    print(f"Recreated container '{new_container.name}' with updated tmpfs.")
 
 if __name__ == "__main__":
-    # size = input("Enter the size for the Ubuntu storage volume : ")
-    interactive_shell("demo_ubuntu")
-    # create_and_interact_with_ubuntu(size=size)
+    choice = input()
+    if choice == "1":
+        size = input("Enter the size for the Ubuntu storage volume : ")
+        create_and_interact_with_ubuntu(size=size)
+    elif choice == "2":
+        interactive_shell("demo_ubuntu")
+    elif choice == "3":
+        container_update("demo_ubuntu")
+    # 
 
