@@ -54,8 +54,13 @@ def interactive_shell(container_name):
         container.start()
         print(f"Connected to container: {container_name}")
         subprocess.run(["docker", "exec", "-it", container.id, "bash"])
-        container.stop()
-        container.remove()
+        choice  = input("To delete type(del)/to stop type(stp)/else(just enter)")
+        if choice == "del":
+            container.stop()
+            container.remove()
+        elif choice == "stp":
+            container.stop()
+        
     except KeyError as e:
         print("Error : ",e)
 
